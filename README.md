@@ -44,7 +44,7 @@ This app requests the `identify` and `guilds` scopes only. It does not ask for y
 - **Server:** Express
 - **Auth:** Discord OAuth2
 - **Client:** HTML, CSS, vanilla JavaScript
-- **Storage:** local JSON counter for successful count generations
+- **Storage:** Upstash Redis for the live generated-count stat, local JSON fallback for development
 
 ## Local Setup
 
@@ -62,6 +62,9 @@ DISCORD_CLIENT_SECRET=your_client_secret
 DISCORD_REDIRECT_URI=http://localhost:3000/callback
 SESSION_SECRET=replace_with_a_long_random_secret
 NODE_ENV=development
+# Optional for a durable generated-count stat in production:
+KV_REST_API_URL=your_upstash_rest_url
+KV_REST_API_TOKEN=your_upstash_rest_token
 ```
 
 Install and run:
@@ -90,8 +93,9 @@ npm run check
 - Set `DISCORD_REDIRECT_URI` to your live `/callback` URL, such as `https://discord-server-count.vercel.app/callback`.
 - Add the same live callback URL in the Discord Developer Portal.
 - Use a long random `SESSION_SECRET`.
+- Add Upstash Redis env vars for a durable generated-count stat. Vercel Marketplace usually provides `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
 
-`data/stats.json` stores only the total number of successful count generations. It does not store Discord credentials, user profiles, or guild lists.
+The generated-count stat stores only a total number. It does not store Discord credentials, user profiles, or guild lists. Locally, `data/stats.json` is used as a development fallback.
 
 ## Credit
 

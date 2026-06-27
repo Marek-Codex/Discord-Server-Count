@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const res = await fetch('/api/stats');
       const stats = await res.json();
       usageCount.textContent = stats.countsGenerated.toLocaleString();
+      usageCount.title = stats.durable ? 'Stored in Redis' : 'Local development counter';
     } catch {
       usageCount.textContent = '--';
     }

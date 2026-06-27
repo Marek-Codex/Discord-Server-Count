@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+const { Redis } = require('@upstash/redis');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -8,19 +9,28 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const statsPath = path.join(__dirname, 'data', 'stats.json');
+const statsKey = 'discord-server-count:counts-generated';
 
 const {
   DISCORD_CLIENT_ID,
   DISCORD_CLIENT_SECRET,
   DISCORD_REDIRECT_URI,
   SESSION_SECRET,
-  NODE_ENV
+  NODE_ENV,
+  KV_REST_API_URL,
+  KV_REST_API_TOKEN,
+  UPSTASH_REDIS_REST_URL,
+  UPSTASH_REDIS_REST_TOKEN
 } = process.env;
 
 const hasDiscordConfig = Boolean(DISCORD_CLIENT_ID && DISCORD_CLIENT_SECRET && DISCORD_REDIRECT_URI);
+const redisUrl = UPSTASH_REDIS_REST_URL || KV_REST_API_URL;
+const redisToken = UPSTASH_REDIS_REST_TOKEN || KV_REST_API_TOKEN;
+const hasRedisConfig = Boolean(redisUrl && redisToken);
 const sessionSecret = SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const cookieName = 'dsc_session';
 const cookieMaxAge = 1000 * 60 * 60 * 24 * 7;
+const redis = hasRedisConfig ? new Redis({ url: redisUrl, token: redisToken }) : null;
 
 if (!hasDiscordConfig) {
   console.warn('Discord OAuth is not configured. Login routes will be unavailable.');
@@ -28,6 +38,10 @@ if (!hasDiscordConfig) {
 
 if (!SESSION_SECRET) {
   console.warn('SESSION_SECRET is not configured. Sessions will reset when the server restarts.');
+}
+
+if (!hasRedisConfig && NODE_ENV === 'production') {
+  console.warn('Upstash Redis is not configured. Counts generated will use non-durable file fallback.');
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -118,34 +132,57 @@ function clearAppSession(res) {
   );
 }
 
-function readStats() {
+async function readStats() {
+  if (redis) {
+    const countsGenerated = Number(await redis.get(statsKey));
+    return {
+      countsGenerated: Number.isFinite(countsGenerated) ? countsGenerated : 0,
+      durable: true
+    };
+  }
+
   try {
     const stats = JSON.parse(fs.readFileSync(statsPath, 'utf8'));
     return {
-      countsGenerated: Number.isInteger(stats.countsGenerated) ? stats.countsGenerated : 0
+      countsGenerated: Number.isInteger(stats.countsGenerated) ? stats.countsGenerated : 0,
+      durable: false
     };
   } catch {
-    return { countsGenerated: 0 };
+    return { countsGenerated: 0, durable: false };
   }
 }
 
-function writeStats(stats) {
+async function writeStats(stats) {
+  if (redis) {
+    await redis.set(statsKey, stats.countsGenerated);
+    return;
+  }
+
   try {
     fs.mkdirSync(path.dirname(statsPath), { recursive: true });
-    fs.writeFileSync(statsPath, JSON.stringify(stats, null, 2));
+    fs.writeFileSync(
+      statsPath,
+      JSON.stringify({ countsGenerated: stats.countsGenerated }, null, 2)
+    );
   } catch (error) {
     console.warn('Unable to write stats:', error.message);
   }
 }
 
-function incrementCountsGenerated(appSession) {
+async function incrementCountsGenerated(appSession) {
   if (appSession.countedUsage) {
     return readStats();
   }
 
-  const stats = readStats();
-  stats.countsGenerated += 1;
-  writeStats(stats);
+  const stats = redis
+    ? { countsGenerated: await redis.incr(statsKey), durable: true }
+    : await readStats();
+
+  if (!redis) {
+    stats.countsGenerated += 1;
+    await writeStats(stats);
+  }
+
   appSession.countedUsage = true;
   return stats;
 }
@@ -234,7 +271,7 @@ app.get('/api/user', requireDiscordConfig, async (req, res) => {
         headers: { Authorization: `Bearer ${appSession.accessToken}` }
       })
     ]);
-    incrementCountsGenerated(appSession);
+    await incrementCountsGenerated(appSession);
     setAppSession(res, appSession);
 
     res.json({
@@ -253,8 +290,8 @@ app.get('/api/user', requireDiscordConfig, async (req, res) => {
   }
 });
 
-app.get('/api/stats', (req, res) => {
-  res.json(readStats());
+app.get('/api/stats', async (req, res) => {
+  res.json(await readStats());
 });
 
 app.get('/logout', (req, res) => {
