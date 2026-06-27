@@ -331,6 +331,19 @@ h1 {
   margin: 0;
 }
 
+.user-id {
+  margin-top: .2rem;
+  color: rgba(174, 194, 216, 0.82);
+  font-family: var(--font-mono);
+  font-size: .75rem;
+  overflow-wrap: anywhere;
+}
+
+.user-id code {
+  color: var(--text);
+  font: inherit;
+}
+
 .label {
   margin-bottom: .2rem;
   color: var(--muted);

@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function loadDashboard() {
     const avatar = document.getElementById('avatar');
     const username = document.getElementById('username');
+    const userId = document.getElementById('userId');
     const serverCount = document.getElementById('serverCount');
     const userCard = document.getElementById('userCard');
 
@@ -89,6 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       username.textContent = data.user.username;
+      userId.textContent = data.user.id;
       serverCount.textContent = data.guildCount.toLocaleString();
 
       if (data.user.avatar) {
@@ -102,6 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       await loadStats();
     } catch {
       username.textContent = 'Error loading';
+      userId.textContent = '--';
       serverCount.textContent = '--';
       userCard.classList.add('is-visible');
     }
