@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord Server Count</title>
+  <link rel="shortcut icon" href="/favicon.ico?v=5" type="image/x-icon">
+  <link rel="icon" href="/favicon.ico?v=5" type="image/x-icon" sizes="any">
+  <link rel="icon" href="/favicon-32x32.png?v=5" type="image/png" sizes="32x32">
+  <link rel="icon" href="/favicon-16x16.png?v=5" type="image/png" sizes="16x16">
+  <link rel="apple-touch-icon" href="/favicon-180x180.png?v=5">
+  <link rel="icon" href="/favicon.svg?v=5" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=9">
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800&family=Kode+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+  <main class="container">
+    <div class="content">
+      <div class="logo" data-discord-logo></div>
+      <p class="node-label">Access node: resolved</p>
+      <h1>Discord Server Count</h1>
+      <p class="subtitle">You are in</p>
+      <p class="count"><span id="serverCount">--</span><span> servers</span></p>
+      <div id="userCard">
+        <img id="avatar" src="" alt="Avatar">
+        <div>
+          <p class="label">Signed in as</p>
+          <p><strong id="username">Loading...</strong></p>
+        </div>
+      </div>
+      <a href="/logout" class="btn btn-secondary">Log out</a>
+    </div>
+  </main>
+
+  <footer class="site-footer" data-site-footer></footer>
+
+  <script src="plexus.js?v=6"></script>
+  <script src="app.js?v=4"></script>
+</body>
+</html>

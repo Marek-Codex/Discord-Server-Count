@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Discord Server Count</title>
+  <defs>
+    <linearGradient id="mark" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3CA0FF"/>
+      <stop offset="1" stop-color="#A03CFF"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 5l24 14v26L32 59 8 45V19L32 5z" fill="url(#mark)"/>
+  <path d="M32 13l17 10v18L32 51 15 41V23l17-10z" fill="#07111C" opacity=".86"/>
+  <path d="M10 24V10h14M54 40v14H40" fill="none" stroke="#F7F8FF" stroke-width="4" stroke-linecap="square"/>
+  <circle cx="32" cy="32" r="8" fill="#5865F2"/>
+  <path d="M19 32h9M36 32h9M32 19v9M32 36v9" stroke="#F7F8FF" stroke-width="4" stroke-linecap="square"/>
+</svg>
