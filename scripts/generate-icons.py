@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "public"
@@ -14,69 +14,92 @@ OUTPUTS = {
 }
 
 
-def point_scale(canvas_size):
-    return canvas_size / 64
+def load_font(size):
+    for font_name in ("arialbd.ttf", "Arial Bold.ttf", "DejaVuSans-Bold.ttf"):
+        try:
+            return ImageFont.truetype(font_name, size)
+        except OSError:
+            pass
+
+    return ImageFont.load_default()
 
 
-def render_icon(size):
+def scaled_points(points, scale):
+    return [(round(x * scale), round(y * scale)) for x, y in points]
+
+
+def draw_line(draw, points, scale, fill, width):
+    draw.line(
+        scaled_points(points, scale),
+        fill=fill,
+        width=max(1, round(width * scale)),
+        joint="curve",
+    )
+
+
+def gradient_hex(size, scale, points):
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).polygon(scaled_points(points, scale), fill=255)
+
+    gradient = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(gradient)
+    top = (0x3C, 0xA0, 0xFF)
+    bottom = (0xA0, 0x3C, 0xFF)
+
+    for y in range(size):
+        t = y / max(1, size - 1)
+        red = round(top[0] + (bottom[0] - top[0]) * t)
+        green = round(top[1] + (bottom[1] - top[1]) * t)
+        blue = round(top[2] + (bottom[2] - top[2]) * t)
+        draw.line([(0, y), (size, y)], fill=(red, green, blue, 255))
+
+    return Image.composite(gradient, Image.new("RGBA", (size, size), (0, 0, 0, 0)), mask)
+
+
+def draw_centered_text(draw, text, center, font, fill, shadow):
+    bbox = draw.textbbox((0, 0), text, font=font, stroke_width=0)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    x = center[0] - text_width / 2 - bbox[0]
+    y = center[1] - text_height / 2 - bbox[1]
+
+    draw.text((x + shadow[0], y + shadow[1]), text, font=font, fill=(0, 0, 0, 150))
+    draw.text((x, y), text, font=font, fill=fill)
+
+
+def render_icon(output_size):
     factor = 4
-    canvas = size * factor
-    scale = point_scale(canvas)
+    canvas = output_size * factor
+    scale = canvas / 256
     image = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
 
-    def scaled(point):
-        return tuple(round(value * scale) for value in point)
+    outer = [(128, 15), (228, 73), (228, 183), (128, 241), (28, 183), (28, 73)]
+    inner = [(128, 43), (202, 86), (202, 170), (128, 213), (54, 170), (54, 86)]
 
-    def polygon(draw, points, fill):
-        draw.polygon([scaled(point) for point in points], fill=fill)
-
-    def line(draw, points, fill, width):
-        draw.line(
-            [scaled(point) for point in points],
-            fill=fill,
-            width=round(width * scale),
-            joint="curve",
-        )
-
-    outer = [(32, 5), (56, 19), (56, 45), (32, 59), (8, 45), (8, 19)]
-    inner = [(32, 13), (49, 23), (49, 41), (32, 51), (15, 41), (15, 23)]
-
-    mask = Image.new("L", image.size, 0)
-    mask_draw = ImageDraw.Draw(mask)
-    mask_draw.polygon([scaled(point) for point in outer], fill=255)
-
-    gradient = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    gradient_draw = ImageDraw.Draw(gradient)
-    start = (0x3C, 0xA0, 0xFF)
-    end = (0xA0, 0x3C, 0xFF)
-    width, height = image.size
-
-    for y in range(height):
-        t = y / max(1, height - 1)
-        red = round(start[0] + (end[0] - start[0]) * t)
-        green = round(start[1] + (end[1] - start[1]) * t)
-        blue = round(start[2] + (end[2] - start[2]) * t)
-        gradient_draw.line([(0, y), (width, y)], fill=(red, green, blue, 255))
-
-    image = Image.composite(gradient, image, mask)
+    image.alpha_composite(gradient_hex(canvas, scale, outer))
     draw = ImageDraw.Draw(image)
 
-    polygon(draw, inner, (7, 17, 28, 222))
-    line(draw, [(32, 5), (56, 19), (56, 45)], (255, 255, 255, 58), 1.2)
-    line(draw, [(8, 19), (8, 45), (32, 59)], (0, 0, 0, 76), 1.6)
+    draw.polygon(scaled_points(inner, scale), fill=(7, 17, 28, 246))
+    draw_line(draw, inner + [inner[0]], scale, (60, 160, 255, 255), 10)
+
+    draw_line(draw, [(128, 15), (228, 73), (228, 183)], scale, (255, 255, 255, 54), 2)
+    draw_line(draw, [(28, 73), (28, 183), (128, 241)], scale, (0, 0, 0, 82), 2)
 
     white = (247, 248, 255, 246)
-    line(draw, [(10, 24), (10, 10), (24, 10)], white, 4)
-    line(draw, [(54, 40), (54, 54), (40, 54)], white, 4)
+    draw_line(draw, [(39, 85), (39, 43), (82, 43)], scale, white, 6)
+    draw_line(draw, [(217, 171), (217, 213), (174, 213)], scale, white, 6)
 
-    draw.ellipse([scaled((24, 24)), scaled((40, 40))], fill=(88, 101, 242, 255))
-    line(draw, [(19, 32), (28, 32)], white, 4)
-    line(draw, [(36, 32), (45, 32)], white, 4)
-    line(draw, [(32, 19), (32, 28)], white, 4)
-    line(draw, [(32, 36), (32, 45)], white, 4)
-    line(draw, [(19, 23), (30, 17), (43, 24)], (255, 255, 255, 38), 1.5)
+    font = load_font(round(68 * scale))
+    draw_centered_text(
+        draw,
+        "SC",
+        (round(128 * scale), round(132 * scale)),
+        font,
+        (247, 248, 255, 255),
+        (round(3 * scale), round(4 * scale)),
+    )
 
-    return image.resize((size, size), Image.Resampling.LANCZOS)
+    return image.resize((output_size, output_size), Image.Resampling.LANCZOS)
 
 
 def main():
