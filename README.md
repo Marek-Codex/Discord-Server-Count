@@ -11,7 +11,7 @@ Tiny Discord OAuth utility that counts how many servers your account is in.
 
 No account system. No settings maze. No dashboard-industrial complex quietly assembling a council in the next room. Discord tells the app your server list, the app counts it, and the dashboard shows the number.
 
-> Live deployment coming once the repo is public and the OAuth callback is pointed at the real domain.
+> Live: [discord-server-count.vercel.app](https://discord-server-count.vercel.app)
 
 ## What It Does
 
@@ -87,7 +87,7 @@ npm run check
 
 - Use HTTPS.
 - Set `NODE_ENV=production`.
-- Set `DISCORD_REDIRECT_URI` to your live `/callback` URL.
+- Set `DISCORD_REDIRECT_URI` to your live `/callback` URL, such as `https://discord-server-count.vercel.app/callback`.
 - Add the same live callback URL in the Discord Developer Portal.
 - Use a long random `SESSION_SECRET`.
 
