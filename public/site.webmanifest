@@ -1,0 +1,27 @@
+{
+  "name": "Discord Server Count",
+  "short_name": "Server Count",
+  "description": "Tiny Discord OAuth utility that counts how many servers you're in.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#050B14",
+  "theme_color": "#3CA0FF",
+  "icons": [
+    {
+      "src": "/favicon-180x180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "/app-icon-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+}

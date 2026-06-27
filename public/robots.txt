@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /callback
+Disallow: /api/
+
+Sitemap: https://discord-server-count.vercel.app/sitemap.xml

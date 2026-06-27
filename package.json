@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "check": "node --check server.js && node --check public/app.js && node --check public/plexus.js",
+    "assets": "npm run icons && npm run social",
     "icons": "python scripts/generate-icons.py",
+    "social": "python scripts/generate-social-card.py",
     "start": "node server.js",
     "dev": "node server.js"
   },
