@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "check": "node --check server.js && node --check public/app.js && node --check public/plexus.js",
+    "icons": "python scripts/generate-icons.py",
     "start": "node server.js",
     "dev": "node server.js"
   },
