@@ -1,7 +1,11 @@
 node_modules/
 .env
+.env.local
+.env.*.local
 *.log
 .DS_Store
 coverage/
 .nyc_output/
 data/stats.json
+
+.vercel
