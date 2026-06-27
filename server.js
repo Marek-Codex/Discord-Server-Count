@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
-const session = require('express-session');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -20,6 +19,8 @@ const {
 
 const hasDiscordConfig = Boolean(DISCORD_CLIENT_ID && DISCORD_CLIENT_SECRET && DISCORD_REDIRECT_URI);
 const sessionSecret = SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const cookieName = 'dsc_session';
+const cookieMaxAge = 1000 * 60 * 60 * 24 * 7;
 
 if (!hasDiscordConfig) {
   console.warn('Discord OAuth is not configured. Login routes will be unavailable.');
@@ -30,21 +31,91 @@ if (!SESSION_SECRET) {
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(
-  session({
-    secret: sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 7
-    }
-  })
-);
 
 function generateState() {
   return crypto.randomBytes(32).toString('hex');
+}
+
+function getKey() {
+  return crypto.createHash('sha256').update(sessionSecret).digest();
+}
+
+function encodeBase64Url(buffer) {
+  return Buffer.from(buffer).toString('base64url');
+}
+
+function decodeBase64Url(value) {
+  return Buffer.from(value, 'base64url');
+}
+
+function sealSession(sessionData) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getKey(), iv);
+  const encrypted = Buffer.concat([
+    cipher.update(JSON.stringify(sessionData), 'utf8'),
+    cipher.final()
+  ]);
+  const tag = cipher.getAuthTag();
+
+  return [
+    encodeBase64Url(iv),
+    encodeBase64Url(tag),
+    encodeBase64Url(encrypted)
+  ].join('.');
+}
+
+function unsealSession(value) {
+  if (!value) return {};
+
+  try {
+    const [iv, tag, encrypted] = value.split('.').map(decodeBase64Url);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', getKey(), iv);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final()
+    ]);
+
+    return JSON.parse(decrypted.toString('utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function parseCookies(req) {
+  return (req.headers.cookie || '')
+    .split(';')
+    .map(cookie => cookie.trim())
+    .filter(Boolean)
+    .reduce((cookies, cookie) => {
+      const separatorIndex = cookie.indexOf('=');
+      if (separatorIndex === -1) return cookies;
+
+      const name = cookie.slice(0, separatorIndex);
+      const value = cookie.slice(separatorIndex + 1);
+      cookies[name] = decodeURIComponent(value);
+      return cookies;
+    }, {});
+}
+
+function getAppSession(req) {
+  return unsealSession(parseCookies(req)[cookieName]);
+}
+
+function setAppSession(res, sessionData) {
+  const secure = NODE_ENV === 'production' ? '; Secure' : '';
+  const value = encodeURIComponent(sealSession(sessionData));
+  res.setHeader(
+    'Set-Cookie',
+    `${cookieName}=${value}; Max-Age=${Math.floor(cookieMaxAge / 1000)}; Path=/; HttpOnly; SameSite=Lax${secure}`
+  );
+}
+
+function clearAppSession(res) {
+  res.setHeader(
+    'Set-Cookie',
+    `${cookieName}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`
+  );
 }
 
 function readStats() {
@@ -67,15 +138,15 @@ function writeStats(stats) {
   }
 }
 
-function incrementCountsGenerated(req) {
-  if (req.session.countedUsage) {
+function incrementCountsGenerated(appSession) {
+  if (appSession.countedUsage) {
     return readStats();
   }
 
   const stats = readStats();
   stats.countsGenerated += 1;
   writeStats(stats);
-  req.session.countedUsage = true;
+  appSession.countedUsage = true;
   return stats;
 }
 
@@ -89,7 +160,7 @@ function requireDiscordConfig(req, res, next) {
 
 app.get('/login', requireDiscordConfig, (req, res) => {
   const state = generateState();
-  req.session.oauthState = state;
+  setAppSession(res, { oauthState: state });
 
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
@@ -105,12 +176,13 @@ app.get('/login', requireDiscordConfig, (req, res) => {
 
 app.get('/callback', requireDiscordConfig, async (req, res) => {
   const { code, state } = req.query;
+  const appSession = getAppSession(req);
 
   if (!code) {
     return res.status(400).send('No code provided');
   }
 
-  if (state !== req.session.oauthState) {
+  if (state !== appSession.oauthState) {
     return res.status(403).send('Invalid state parameter');
   }
 
@@ -132,9 +204,12 @@ app.get('/callback', requireDiscordConfig, async (req, res) => {
     );
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
-    req.session.accessToken = access_token;
-    req.session.refreshToken = refresh_token;
-    req.session.tokenExpiry = Date.now() + expires_in * 1000;
+    setAppSession(res, {
+      accessToken: access_token,
+      refreshToken: refresh_token,
+      tokenExpiry: Date.now() + expires_in * 1000,
+      countedUsage: false
+    });
 
     res.redirect('/dashboard');
   } catch (error) {
@@ -144,20 +219,23 @@ app.get('/callback', requireDiscordConfig, async (req, res) => {
 });
 
 app.get('/api/user', requireDiscordConfig, async (req, res) => {
-  if (!req.session.accessToken) {
+  const appSession = getAppSession(req);
+
+  if (!appSession.accessToken) {
     return res.status(401).json({ authenticated: false });
   }
 
   try {
     const [userResponse, guildsResponse] = await Promise.all([
       axios.get('https://discord.com/api/users/@me', {
-        headers: { Authorization: `Bearer ${req.session.accessToken}` }
+        headers: { Authorization: `Bearer ${appSession.accessToken}` }
       }),
       axios.get('https://discord.com/api/users/@me/guilds', {
-        headers: { Authorization: `Bearer ${req.session.accessToken}` }
+        headers: { Authorization: `Bearer ${appSession.accessToken}` }
       })
     ]);
-    incrementCountsGenerated(req);
+    incrementCountsGenerated(appSession);
+    setAppSession(res, appSession);
 
     res.json({
       authenticated: true,
@@ -180,20 +258,19 @@ app.get('/api/stats', (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.redirect('/');
-  });
+  clearAppSession(res);
+  res.redirect('/');
 });
 
 app.get('/dashboard', (req, res) => {
-  if (!req.session.accessToken) {
+  if (!getAppSession(req).accessToken) {
     return res.redirect('/');
   }
   res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 app.get('/', (req, res) => {
-  if (req.session.accessToken) {
+  if (getAppSession(req).accessToken) {
     return res.redirect('/dashboard');
   }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
