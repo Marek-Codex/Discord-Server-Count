@@ -18,15 +18,21 @@ const {
   NODE_ENV
 } = process.env;
 
-if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET || !DISCORD_REDIRECT_URI || !SESSION_SECRET) {
-  console.error('Missing required environment variables. Check your .env file.');
-  process.exit(1);
+const hasDiscordConfig = Boolean(DISCORD_CLIENT_ID && DISCORD_CLIENT_SECRET && DISCORD_REDIRECT_URI);
+const sessionSecret = SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+
+if (!hasDiscordConfig) {
+  console.warn('Discord OAuth is not configured. Login routes will be unavailable.');
+}
+
+if (!SESSION_SECRET) {
+  console.warn('SESSION_SECRET is not configured. Sessions will reset when the server restarts.');
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(
   session({
-    secret: SESSION_SECRET,
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -53,8 +59,12 @@ function readStats() {
 }
 
 function writeStats(stats) {
-  fs.mkdirSync(path.dirname(statsPath), { recursive: true });
-  fs.writeFileSync(statsPath, JSON.stringify(stats, null, 2));
+  try {
+    fs.mkdirSync(path.dirname(statsPath), { recursive: true });
+    fs.writeFileSync(statsPath, JSON.stringify(stats, null, 2));
+  } catch (error) {
+    console.warn('Unable to write stats:', error.message);
+  }
 }
 
 function incrementCountsGenerated(req) {
@@ -69,7 +79,15 @@ function incrementCountsGenerated(req) {
   return stats;
 }
 
-app.get('/login', (req, res) => {
+function requireDiscordConfig(req, res, next) {
+  if (!hasDiscordConfig) {
+    return res.status(503).send('Discord OAuth is not configured yet.');
+  }
+
+  next();
+}
+
+app.get('/login', requireDiscordConfig, (req, res) => {
   const state = generateState();
   req.session.oauthState = state;
 
@@ -85,7 +103,7 @@ app.get('/login', (req, res) => {
   res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
 });
 
-app.get('/callback', async (req, res) => {
+app.get('/callback', requireDiscordConfig, async (req, res) => {
   const { code, state } = req.query;
 
   if (!code) {
@@ -125,7 +143,7 @@ app.get('/callback', async (req, res) => {
   }
 });
 
-app.get('/api/user', async (req, res) => {
+app.get('/api/user', requireDiscordConfig, async (req, res) => {
   if (!req.session.accessToken) {
     return res.status(401).json({ authenticated: false });
   }
@@ -181,6 +199,10 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
