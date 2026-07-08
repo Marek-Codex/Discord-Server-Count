@@ -7,7 +7,6 @@ PUBLIC = ROOT / "public"
 OUTPUTS = {
     "favicon-16x16.png": 16,
     "favicon-32x32.png": 32,
-    "favicon-48x48.png": 48,
     "favicon-180x180.png": 180,
     "favicon.png": 256,
     "app-icon-1024.png": 1024,
