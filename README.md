@@ -1,57 +1,105 @@
+<div align="center">
+
 # Discord Server Count
 
-![Node.js](https://img.shields.io/badge/node.js-18%2B-3CA0FF)
-![Express](https://img.shields.io/badge/express-4.x-5865F2)
-![OAuth](https://img.shields.io/badge/discord-oauth-5865F2)
-![YAGNI](https://img.shields.io/badge/yagni-mostly-3CA0FF)
+**One question. One OAuth flow. One number.**
 
-![README visits](https://count.getloli.com/@marek-codex.discord-server-count?theme=booru-lewd)
+[![Live app](https://img.shields.io/badge/live-discord--server--count.vercel.app-3CA0FF?style=for-the-badge&logo=vercel&logoColor=white)](https://discord-server-count.vercel.app)
 
-Tiny Discord OAuth utility that counts how many servers your account is in.
+![Next.js](https://img.shields.io/badge/Next.js-16-07111C?style=flat-square&logo=next.js)
+![React](https://img.shields.io/badge/React-19-3CA0FF?style=flat-square&logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-5865F2?style=flat-square&logo=typescript&logoColor=white)
+![Discord OAuth](https://img.shields.io/badge/Discord-OAuth2-5865F2?style=flat-square&logo=discord&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-deployed-07111C?style=flat-square&logo=vercel)
 
-No account system. No settings maze. No dashboard-industrial complex quietly assembling a council in the next room. Discord hands over the guild list, the app counts it, and you get the number.
+![Discord Server Count social card](./public/og-image.png)
 
-**Live:** [discord-server-count.vercel.app](https://discord-server-count.vercel.app)
+</div>
 
-## What It Does
+Discord Server Count is a deliberately tiny web app that tells you how many
+Discord servers your account belongs to.
 
-1. Log in with Discord.
-2. Fetch your basic profile and guild list.
-3. Count the guilds.
-4. Show the result.
+No account system. No settings maze. No dashboard-industrial complex quietly
+assembling a council in the next room. Discord hands over the guild list, the
+app counts it, and you get the number.
+
+## How It Works
+
+```mermaid
+flowchart LR
+    visitor([You]) -->|Log in| oauth[Discord OAuth2]
+    oauth -->|identify + guilds| callback[Encrypted session]
+    callback --> count[Count guilds]
+    count --> result([Show the number])
+    result -. successful count .-> redis[(Upstash Redis)]
+```
+
+1. You sign in through Discord OAuth.
+2. Discord returns your basic profile and guild list.
+3. The server counts the guilds.
+4. The browser receives your profile and the count—not the guild list.
 
 Wicked elaborate, I know.
 
-## Privacy-ish Notes
+## Privacy
 
-The app requests only `identify` and `guilds`.
+The app requests only Discord's `identify` and `guilds` scopes.
 
-It does not ask for your password, messages, billing info, or permission to rearrange your life. The session cookie stores the OAuth result long enough for the dashboard to load. The generated-count stat stores only a total number of successful count generations.
+- Your password, messages, and billing information are never requested.
+- OAuth data lives in an encrypted, HTTP-only session cookie.
+- The guild list is counted on the server and is not sent to the browser.
+- Redis stores one aggregate statistic: the number of counts generated.
+- There is no user-account database.
+
+## Architecture
+
+```text
+src/
+├── app/          Pages and HTTP route handlers
+│   ├── api/      User and aggregate-stat APIs
+│   ├── callback/ Discord OAuth callback
+│   ├── dashboard Result page
+│   ├── login/    OAuth entry point
+│   └── logout/   Session cleanup
+├── components/   Small interactive React components
+└── lib/          Discord, session, configuration, and stats logic
+
+public/           Static icons, manifest, robots, sitemap, and social card
+scripts/          Reproducible icon and social-card generators
+```
+
+The file count is mostly framework convention: each public URL has an obvious
+home. Business logic stays out of route handlers, interactive behavior stays
+out of server components, and deployment needs no custom server adapter.
 
 ## Stack
 
-- **Framework:** Next.js App Router
-- **Language:** TypeScript
-- **Auth:** Discord OAuth2
-- **UI:** React with locally optimized Google fonts
-- **Storage:** Upstash Redis for the live generated-count stat, local JSON fallback for development
+| Concern | Choice |
+| --- | --- |
+| Framework | Next.js App Router |
+| UI | React |
+| Language | TypeScript |
+| Authentication | Discord OAuth2 |
+| Session | AES-256-GCM encrypted cookie |
+| Aggregate stats | Upstash Redis |
+| Hosting | Vercel |
 
-The product stays intentionally small. The code is split by responsibility:
+## Run Locally
 
-- `src/app` owns pages and HTTP route handlers.
-- `src/components` owns the small interactive UI pieces.
-- `src/lib` owns Discord, session, configuration, and stats logic.
-- `public` contains only files served as-is.
+Requirements:
 
-## Local Setup
+- Node.js 20.9 or newer
+- A Discord application
+- Redis is optional; development falls back to `data/stats.json`
 
-Create a Discord application in the [Discord Developer Portal](https://discord.com/developers/applications), then add this redirect URI:
+Add this redirect URI in the
+[Discord Developer Portal](https://discord.com/developers/applications):
 
 ```text
 http://localhost:3000/callback
 ```
 
-Copy `.env.example` to `.env` and fill in the values:
+Copy `.env.example` to `.env.local`, then fill in:
 
 ```env
 DISCORD_CLIENT_ID=your_client_id
@@ -63,28 +111,23 @@ KV_REST_API_URL=
 KV_REST_API_TOKEN=
 ```
 
-Install, run, and check:
-
 ```bash
 npm install
 npm run dev
-npm run check
-npm run build
 ```
 
-Open `http://localhost:3000`.
+Open [localhost:3000](http://localhost:3000).
 
-## Production
+## Quality Checks
 
-- Vercel detects Next.js automatically; no custom build configuration is needed.
-- Set `DISCORD_REDIRECT_URI` to your live `/callback` URL.
-- Add that same callback URL in the Discord Developer Portal.
-- Set a long random `SESSION_SECRET`.
-- Add `KV_REST_API_URL` and `KV_REST_API_TOKEN` for durable generated-count stats.
+```bash
+npm run check   # TypeScript + ESLint
+npm run build   # Production build
+```
 
-Vercel Marketplace’s Upstash Redis integration provides the `KV_*` variables automatically.
+## Regenerate Assets
 
-## Assets
+The committed icons and social card are reproducible:
 
 ```bash
 npm run icons
@@ -92,6 +135,27 @@ npm run social
 npm run assets
 ```
 
+The scripts require Python and Pillow.
+
+## Deploy
+
+Vercel detects Next.js automatically. Production needs:
+
+- `DISCORD_CLIENT_ID`
+- `DISCORD_CLIENT_SECRET`
+- `DISCORD_REDIRECT_URI`
+- `SESSION_SECRET`
+- `KV_REST_API_URL`
+- `KV_REST_API_TOKEN`
+
+The production callback URL must also be registered in Discord:
+
+```text
+https://discord-server-count.vercel.app/callback
+```
+
 ## Credit
 
-Inspired by [NobreHD/Discord-Server-Count](https://github.com/NobreHD/Discord-Server-Count), with a different stack and a mildly suspicious access-node coat of paint.
+Inspired by
+[NobreHD/Discord-Server-Count](https://github.com/NobreHD/Discord-Server-Count),
+with a different stack and a mildly suspicious access-node coat of paint.
