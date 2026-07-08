@@ -30,11 +30,18 @@ It does not ask for your password, messages, billing info, or permission to rear
 
 ## Stack
 
-- **Runtime:** Node.js
-- **Server:** Express
+- **Framework:** Next.js App Router
+- **Language:** TypeScript
 - **Auth:** Discord OAuth2
-- **Client:** HTML, CSS, vanilla JavaScript
+- **UI:** React with locally optimized Google fonts
 - **Storage:** Upstash Redis for the live generated-count stat, local JSON fallback for development
+
+The product stays intentionally small. The code is split by responsibility:
+
+- `src/app` owns pages and HTTP route handlers.
+- `src/components` owns the small interactive UI pieces.
+- `src/lib` owns Discord, session, configuration, and stats logic.
+- `public` contains only files served as-is.
 
 ## Local Setup
 
@@ -60,16 +67,16 @@ Install, run, and check:
 
 ```bash
 npm install
-npm start
+npm run dev
 npm run check
+npm run build
 ```
 
 Open `http://localhost:3000`.
 
 ## Production
 
-- Use HTTPS.
-- Set `NODE_ENV=production`.
+- Vercel detects Next.js automatically; no custom build configuration is needed.
 - Set `DISCORD_REDIRECT_URI` to your live `/callback` URL.
 - Add that same callback URL in the Discord Developer Portal.
 - Set a long random `SESSION_SECRET`.

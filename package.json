@@ -1,20 +1,31 @@
 {
   "name": "discord-server-count",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "private": true,
   "description": "Tiny Discord OAuth utility that counts how many servers you're in",
-  "main": "server.js",
   "scripts": {
-    "check": "node --check server.js && node --check public/app.js && node --check public/plexus.js",
+    "build": "next build",
+    "check": "npm run typecheck && npm run lint",
+    "dev": "next dev",
+    "lint": "eslint .",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
     "assets": "npm run icons && npm run social",
     "icons": "python scripts/generate-icons.py",
-    "social": "python scripts/generate-social-card.py",
-    "start": "node server.js",
-    "dev": "node server.js"
+    "social": "python scripts/generate-social-card.py"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",
-    "axios": "^1.6.0",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2"
+    "next": "^16.2.10",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.10",
+    "typescript": "^6.0.3"
   }
 }
