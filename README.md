@@ -12,6 +12,8 @@
 ![Discord OAuth](https://img.shields.io/badge/Discord-OAuth2-5865F2?style=flat-square&logo=discord&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-deployed-07111C?style=flat-square&logo=vercel)
 
+![README visits](https://count.getloli.com/@marek-codex.discord-server-count?theme=booru-lewd)
+
 ![Discord Server Count social card](./public/og-image.png)
 
 </div>
